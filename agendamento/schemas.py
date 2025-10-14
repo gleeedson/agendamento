@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr
 
 
 # Schemas = Contratos
@@ -19,6 +19,8 @@ class UserPublic(BaseModel):
     email: EmailStr
     id: int
     is_admin: bool
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 # usuário no DB
