@@ -1,11 +1,18 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+from agendamento.models import table_registry
 from agendamento.settings import Settings
 
-engine = create_engine(Settings().DATABASE_URL)
+settings = Settings()
+
+engine = create_engine(settings.DATABASE_URL)
 
 
 def get_session():
     with Session(engine) as session:
         yield session
+
+
+def create_tables():
+    table_registry.metadata.create_all(engine)
