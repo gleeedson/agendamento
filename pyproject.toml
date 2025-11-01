@@ -28,6 +28,9 @@ dev = [
     "taskipy (>=1.14.1,<2.0.0)"
 ]
 
+[tool.poetry.dependencies]
+psycopg2-binary = "^2.9" # Or psycopg2 if you need to compile it
+
 [tool.ruff]
 line-length = 79
 extend-exclude = ['migrations']
