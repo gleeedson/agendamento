@@ -6,7 +6,14 @@ from agendamento.settings import Settings
 
 settings = Settings()
 
-engine = create_engine(settings.DATABASE_URL)
+engine_args = {}
+if settings.DATABASE_URL.startswith('postgresql'):
+    engine_args = {
+        'pool_pre_ping': True,
+        'pool_recycle': 300,
+    }
+
+engine = create_engine(settings.DATABASE_URL, **engine_args)
 
 
 def get_session():
