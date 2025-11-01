@@ -1,6 +1,7 @@
+from datetime import date, time
 from http import HTTPStatus
 
-from agendamento.schemas import UserPublic
+from agendamento.models import Agendamento
 
 
 def test_root_deve_retornar_ok_e_ola_mundo(client):
@@ -13,108 +14,111 @@ def test_root_deve_retornar_ok_e_ola_mundo(client):
 
 def test_create_user(client):
     response = client.post(
-        '/users/',
+        '/registrar/',
         json={
-            'username': 'alice',
+            'nome': 'alice',
             'email': 'alice@example.com',
-            'password': 'secret',
+            'senha': 'secret',
         },
     )
     assert response.status_code == HTTPStatus.CREATED
     assert response.json() == {
-        'username': 'alice',
+        'nome': 'alice',
         'email': 'alice@example.com',
         'id': 1,
         'is_admin': False,
     }
 
 
-def test_read_users(client):
-    response = client.get('/users/')
-    assert response.status_code == HTTPStatus.OK
-    assert response.json() == {'users': []}
-
-
-def test_read_users_with_users(client, user):
-    user_schema = UserPublic.model_validate(user).model_dump()
-    response = client.get('/users/')
-    assert response.status_code == HTTPStatus.OK
-    assert response.json() == {'users': [user_schema]}
-
-
-def test_read_user_not_found(client):
-    response = client.get('/users/0')
-    assert response.status_code == HTTPStatus.NOT_FOUND
-    assert response.json() == {'detail': 'User not found'}
-
-
-def test_update_user(client, user):
-    response = client.put(
-        '/users/1',
+def test_registrar_email_duplicado(client, user):
+    response = client.post(
+        '/registrar',
         json={
-            'username': 'bob',
-            'email': 'bob@example.com',
-            'password': 'mynewpassword',
+            'nome': 'Outro Usuario',
+            'email': user.email,
+            'senha': 'senha123',
         },
     )
+    assert response.status_code == HTTPStatus.BAD_REQUEST
+    assert response.json() == {'detail': 'Email já cadastrado'}
+
+
+def test_login_sucesso(client, user):
+    response = client.post(
+        '/login',
+        json={'email': user.email, 'senha': user.senha},
+    )
     assert response.status_code == HTTPStatus.OK
-    assert response.json() == {
-        'username': 'bob',
-        'email': 'bob@example.com',
-        'id': 1,
-        'is_admin': False,
-    }
+    data = response.json()
+    assert 'access_token' in data
+    assert data['token_type'] == 'bearer'
 
 
-def test_update_integrity_error(client, user):
-    # Criando um registro para "fausto"
-    client.post(
-        '/users',
-        json={
-            'username': 'fausto',
-            'email': 'fausto@example.com',
-            'password': 'secret',
-        },
+def test_login_senha_incorreta(client, user):
+    response = client.post(
+        '/login',
+        json={'email': user.email, 'senha': 'senha_errada'},
     )
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
 
-    # Alterando o user.username das fixture para fausto
-    response_update = client.put(
-        f'/users/{user.id}',
-        json={
-            'username': 'fausto',
-            'email': 'bob@example.com',
-            'password': 'mynewpassword',
-        },
+
+def test_criar_agendamento(client, token):
+    response = client.post(
+        '/agendar',
+        json={'data': '2025-11-01', 'hora': '10:00:00'},
+        headers={'Authorization': f'Bearer {token}'},
     )
+    assert response.status_code == HTTPStatus.CREATED
+    data = response.json()
+    assert data['data'] == '2025-11-01'
+    assert data['hora'] == '10:00:00'
 
-    assert response_update.status_code == HTTPStatus.CONFLICT
-    assert response_update.json() == {
-        'detail': 'Username or Email already exists'
-        }
 
-
-def test_update_user_not_found(client):
-    response = client.put(
-        '/users/0',
-        json={
-            'username': 'bob',
-            'email': 'bob@example.com',
-            'password': 'mynewpassword',
-        },
+def test_listar_usuarios_admin(client, admin_token):
+    response = client.get(
+        '/admin/usuarios',
+        headers={'Authorization': f'Bearer {admin_token}'},
     )
-    assert response.status_code == HTTPStatus.NOT_FOUND
-    assert response.json() == {'detail': 'User not found'}
-
-
-def test_delete_user(client, user):
-    response = client.delete('/users/1')
-
     assert response.status_code == HTTPStatus.OK
-    assert response.json() == {'message': 'User deleted'}
+    data = response.json()
+    assert 'users' in data
 
 
-def test_delete_user_not_found(client):
-    response = client.delete('/users/0')
+def test_listar_usuarios_nao_admin(client, token):
+    response = client.get(
+        '/admin/usuarios',
+        headers={'Authorization': f'Bearer {token}'},
+    )
+    assert response.status_code == HTTPStatus.FORBIDDEN
 
-    assert response.status_code == HTTPStatus.NOT_FOUND
-    assert response.json() == {'detail': 'User not found'}
+
+def test_remover_usuario(client, admin_token, user):
+    response = client.delete(
+        f'/admin/usuarios/{user.id}',
+        headers={'Authorization': f'Bearer {admin_token}'},
+    )
+    assert response.status_code == HTTPStatus.OK
+    assert response.json() == {'message': 'Usuário removido com sucesso'}
+
+
+def test_listar_meus_agendamentos(client, token, session, user):
+    # Criar agendamentos
+    agendamento1 = Agendamento(
+        id_usuario=user.id,
+        data=date(2025, 11, 1),
+        hora=time(10, 0),
+    )
+    agendamento2 = Agendamento(
+        id_usuario=user.id,
+        data=date(2025, 11, 2),
+        hora=time(14, 0),
+    )
+    session.add(agendamento1)
+    session.add(agendamento2)
+    session.commit()
+
+    response = client.get(
+        '/meus-agendamentos',
+        headers={'Authorization': f'Bearer {token}'},
+    )
+    assert response.status_code == HTTPStatus.OK

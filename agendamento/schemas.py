@@ -34,24 +34,24 @@ class UserLogin(BaseModel):
     senha: str
 
 
-# Token 
+# Token
 class Token(BaseModel):
     access_token: str
     token_type: str
 
 
-# Agendamento 
-class AgendamentoCreate(BaseModel):
+# Agendamento
+class AgendamentoCriar(BaseModel):
     data: date
     hora: time
 
 
-class AgendamentoPublic(BaseModel):
+class AgendamentoPublico(BaseModel):
     id: int
-    usuario_id: int
+    id_usuario: int
     data: date
     hora: time
-    usuario_nome: str
+    nome_usuario: str
     model_config = ConfigDict(from_attributes=True)
 
 

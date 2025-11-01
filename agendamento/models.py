@@ -23,6 +23,6 @@ class Agendamento:
     __table_args__ = (UniqueConstraint('data', 'hora'),)
 
     id: Mapped[int] = mapped_column(init=False, primary_key=True)
-    usuario_id: Mapped[int] = mapped_column(ForeignKey('users.id'))
+    id_usuario: Mapped[int] = mapped_column(ForeignKey('users.id'))
     data: Mapped[date]
     hora: Mapped[time]

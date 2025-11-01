@@ -1,14 +1,15 @@
 from datetime import date, time
 
 from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from agendamento.database import get_session
 from agendamento.models import Agendamento, User
 from agendamento.schemas import (
-    AgendamentoCreate,
-    AgendamentoPublic,
+    AgendamentoCriar,
+    AgendamentoPublico,
     HorariosDisponiveis,
     Message,
     Token,
@@ -17,7 +18,6 @@ from agendamento.schemas import (
     UserPublic,
     UserSchema,
 )
-
 from agendamento.security import (
     criar_token,
     get_current_admin,
@@ -26,10 +26,27 @@ from agendamento.security import (
 
 app = FastAPI(title='API de agendamentos')
 
-database = []
+
+# Configurar CORS
+origins = [
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+    'http://localhost:5500',
+    'http://127.0.0.1:5500',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=['*'],
+    allow_headers=['*'],
+)
 
 
-@app.get('/', status.HTTP_200_OK, response_model=Message)
+@app.get('/', status_code=status.HTTP_200_OK, response_model=Message)
 def read_root():
     return {'message': 'Olá Mundo!'}
 
@@ -117,11 +134,11 @@ def horarios_disponiveis(
 
 @app.post(
     '/agendar',
-    response_model=AgendamentoPublic,
+    response_model=AgendamentoPublico,
     status_code=status.HTTP_201_CREATED,
 )
 def criar_agendamento(
-    agendamento: AgendamentoCreate,
+    agendamento: AgendamentoCriar,
     session: Session = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
@@ -141,7 +158,7 @@ def criar_agendamento(
 
     # cria agendamento
     novo_agendamento = Agendamento(
-        usuario_id=user.id,
+        id_usuario=user.id,
         data=agendamento.data,
         hora=agendamento.hora,
     )
@@ -150,33 +167,33 @@ def criar_agendamento(
     session.refresh(novo_agendamento)
 
     # mostra nome do aluno no agendamento
-    return AgendamentoPublic(
+    return AgendamentoPublico(
         id=novo_agendamento.id,
-        usuario_id=novo_agendamento.usuario_id,
+        id_usuario=novo_agendamento.id_usuario,
         data=novo_agendamento.data,
         hora=novo_agendamento.hora,
-        usuario_nome=user.nome,
+        nome_usuario=user.nome,
     )
 
 
-@app.get('/meus-agendamentos', response_model=list[AgendamentoPublic])
+@app.get('/meus-agendamentos', response_model=list[AgendamentoPublico])
 def listar_meus_agendamentos(
     session: Session = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
     agendamentos = session.scalars(
         select(Agendamento)
-        .where(Agendamento.usuario_id == user.id)
+        .where(Agendamento.id_usuario == user.id)
         .order_by(Agendamento.data, Agendamento.hora)
     ).all()
 
     return [
-        AgendamentoPublic(
+        AgendamentoPublico(
             id=a.id,
-            usuario_id=a.usuario_id,
+            id_usuario=a.id_usuario,
             data=a.data,
             hora=a.hora,
-            usuario_nome=user.nome,
+            nome_usuario=user.nome,
         )
         for a in agendamentos
     ]
@@ -191,7 +208,7 @@ def cancelar_agendamento(
     agendamento = session.scalar(
         select(Agendamento).where(
             Agendamento.id == agendamento_id,
-            Agendamento.usuario_id == user.id,
+            Agendamento.id_usuario == user.id,
         )
     )
 
@@ -271,7 +288,7 @@ def remover_usuario_admin(
     return {'message': 'Usuário removido com sucesso'}
 
 
-@app.get('/admin/agendamentos', response_model=list[AgendamentoPublic])
+@app.get('/admin/agendamentos', response_model=list[AgendamentoPublico])
 def listar_todos_agendamentos(
     session: Session = Depends(get_session),
     admin: User = Depends(get_current_admin),
@@ -282,14 +299,14 @@ def listar_todos_agendamentos(
 
     result = []
     for a in agendamentos:
-        user = session.scalar(select(User).where(User.id == a.usuario_id))
+        user = session.scalar(select(User).where(User.id == a.id_usuario))
         result.append(
-            AgendamentoPublic(
+            AgendamentoPublico(
                 id=a.id,
-                usuario_id=a.usuario_id,
+                id_usuario=a.id_usuario,
                 data=a.data,
                 hora=a.hora,
-                usuario_nome=user.nome if user else 'Desconhecido',
+                nome_usuario=user.nome if user else 'Desconhecido',
             )
         )
 

@@ -7,6 +7,7 @@ from sqlalchemy.pool import StaticPool
 from agendamento.app import app
 from agendamento.database import get_session
 from agendamento.models import User, table_registry
+from agendamento.security import criar_token
 
 
 # O TestClient do FastAPI é uma classe para testar API
@@ -43,9 +44,9 @@ def session():
 @pytest.fixture
 def user(session):
     user = User(
-        username='Teste',
+        nome='Teste',
         email='teste@test.com',
-        password='testtest',
+        senha='testtest',
         is_admin=False,
     )
     session.add(user)
@@ -53,3 +54,35 @@ def user(session):
     session.refresh(user)
 
     return user
+
+
+@pytest.fixture
+def admin_user(session):
+    admin = User(
+        nome='Admin User',
+        email='admin@example.com',
+        senha='admin123',
+        is_admin=True,
+    )
+    session.add(admin)
+    session.commit()
+    session.refresh(admin)
+    return admin
+
+
+@pytest.fixture
+def token(user):
+    return criar_token({
+        'user_id': user.id,
+        'email': user.email,
+        'is_admin': user.is_admin,
+    })
+
+
+@pytest.fixture
+def admin_token(admin_user):
+    return criar_token({
+        'user_id': admin_user.id,
+        'email': admin_user.email,
+        'is_admin': admin_user.is_admin,
+    })
