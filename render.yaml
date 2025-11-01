@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: agendamento-api
+    env: python
+    buildCommand: "pip install poetry && poetry config virtualenvs.create false && poetry install --only main"
+    startCommand: "poetry run uvicorn agendamento.app:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_HOURS
+        value: 24
