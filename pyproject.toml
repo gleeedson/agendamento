@@ -29,7 +29,9 @@ dev = [
 ]
 
 [tool.poetry.dependencies]
-psycopg2-binary = "^2.9" # Or psycopg2 if you need to compile it
+python = "^3.13"
+psycopg2-binary = "^2.9.9"
+
 
 [tool.ruff]
 line-length = 79
