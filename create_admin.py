@@ -1,4 +1,4 @@
-# Cria tabelas e admin 
+# Cria tabelas e admin
 
 from sqlalchemy import select
 

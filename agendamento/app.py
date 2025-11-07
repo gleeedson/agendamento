@@ -35,6 +35,10 @@ origins = [
     'http://127.0.0.1:5500',
     'http://localhost:3000',
     'http://127.0.0.1:3000',
+    'https://agendamento-front.onrender.com',
+    'https://690e0eee4a3e6a881385e8c2--bucolic-llama-3a585d.netlify.app/',
+    'http://agendamento-front.onrender.com',
+    'http://690e0eee4a3e6a881385e8c2--bucolic-llama-3a585d.netlify.app/',
 ]
 
 app.add_middleware(
