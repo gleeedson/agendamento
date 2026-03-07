@@ -65,12 +65,12 @@ def test_login_senha_incorreta(client, user):
 def test_criar_agendamento(client, token):
     response = client.post(
         '/agendar',
-        json={'data': '2025-11-01', 'hora': '10:00:00'},
+        json={'data': '2029-11-01', 'hora': '10:00:00'},
         headers={'Authorization': f'Bearer {token}'},
     )
     assert response.status_code == HTTPStatus.CREATED
     data = response.json()
-    assert data['data'] == '2025-11-01'
+    assert data['data'] == '2029-11-01'
     assert data['hora'] == '10:00:00'
 
 
@@ -105,12 +105,12 @@ def test_listar_meus_agendamentos(client, token, session, user):
     # Criar agendamentos
     agendamento1 = Agendamento(
         id_usuario=user.id,
-        data=date(2025, 11, 1),
+        data=date(2029, 11, 1),
         hora=time(10, 0),
     )
     agendamento2 = Agendamento(
         id_usuario=user.id,
-        data=date(2025, 11, 2),
+        data=date(2029, 11, 2),
         hora=time(14, 0),
     )
     session.add(agendamento1)
