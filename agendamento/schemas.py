@@ -46,6 +46,13 @@ class AgendamentoCriar(BaseModel):
     hora: time
 
 
+# Admin pode agendar aluno
+class AgendamentoAdminCriar(BaseModel):
+    id_usuario: int
+    data: date
+    hora: time
+
+
 class AgendamentoPublico(BaseModel):
     id: int
     id_usuario: int
