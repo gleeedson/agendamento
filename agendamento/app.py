@@ -1,4 +1,4 @@
-from datetime import date, time
+from datetime import date, datetime, time
 
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from agendamento.database import get_session
 from agendamento.models import Agendamento, User
 from agendamento.schemas import (
+    AgendamentoAdminCriar,
     AgendamentoCriar,
     AgendamentoPublico,
     HorariosDisponiveis,
@@ -146,6 +147,14 @@ def criar_agendamento(
     session: Session = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
+    # Verifica se o agendamento é no passado
+    data_hora_agendamento = datetime.combine(agendamento.data, agendamento.hora)
+    if data_hora_agendamento < datetime.now():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='Não é possível criar agendamentos no passado',
+        )
+    
     # Verifica horário disponível
     existe = session.scalar(
         select(Agendamento).where(
@@ -290,6 +299,65 @@ def remover_usuario_admin(
     session.commit()
 
     return {'message': 'Usuário removido com sucesso'}
+
+
+@app.post(
+    '/admin/agendar',
+    response_model=AgendamentoPublico,
+    status_code=status.HTTP_201_CREATED,
+)
+def criar_agendamento_admin(
+    agendamento: AgendamentoAdminCriar,
+    session: Session = Depends(get_session),
+    admin: User = Depends(get_current_admin),
+):
+    # Verifica se o usuário existe
+    user = session.scalar(select(User).where(User.id == agendamento.id_usuario))
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail='Usuário não encontrado',
+        )
+
+    # Verifica se o agendamento é no passado
+    data_hora_agendamento = datetime.combine(agendamento.data, agendamento.hora)
+    if data_hora_agendamento < datetime.now():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='Não é possível criar agendamentos no passado',
+        )
+
+    # Verifica horário disponível
+    existe = session.scalar(
+        select(Agendamento).where(
+            Agendamento.data == agendamento.data,
+            Agendamento.hora == agendamento.hora,
+        )
+    )
+
+    if existe:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='Horário indisponível',
+        )
+
+    # cria agendamento
+    novo_agendamento = Agendamento(
+        id_usuario=user.id,
+        data=agendamento.data,
+        hora=agendamento.hora,
+    )
+    session.add(novo_agendamento)
+    session.commit()
+    session.refresh(novo_agendamento)
+
+    return AgendamentoPublico(
+        id=novo_agendamento.id,
+        id_usuario=novo_agendamento.id_usuario,
+        data=novo_agendamento.data,
+        hora=novo_agendamento.hora,
+        nome_usuario=user.nome,
+    )
 
 
 @app.get('/admin/agendamentos', response_model=list[AgendamentoPublico])
