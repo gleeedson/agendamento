@@ -148,13 +148,16 @@ def criar_agendamento(
     user: User = Depends(get_current_user),
 ):
     # Verifica se o agendamento é no passado
-    data_hora_agendamento = datetime.combine(agendamento.data, agendamento.hora)
+    data_hora_agendamento = datetime.combine(
+        agendamento.data,
+        agendamento.hora
+        )
     if data_hora_agendamento < datetime.now():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail='Não é possível criar agendamentos no passado',
         )
-    
+
     # Verifica horário disponível
     existe = session.scalar(
         select(Agendamento).where(
@@ -312,7 +315,9 @@ def criar_agendamento_admin(
     admin: User = Depends(get_current_admin),
 ):
     # Verifica se o usuário existe
-    user = session.scalar(select(User).where(User.id == agendamento.id_usuario))
+    user = session.scalar(select(User).where(
+        User.id == agendamento.id_usuario
+        ))
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -320,7 +325,10 @@ def criar_agendamento_admin(
         )
 
     # Verifica se o agendamento é no passado
-    data_hora_agendamento = datetime.combine(agendamento.data, agendamento.hora)
+    data_hora_agendamento = datetime.combine(
+        agendamento.data,
+        agendamento.hora
+        )
     if data_hora_agendamento < datetime.now():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
