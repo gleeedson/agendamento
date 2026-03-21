@@ -40,6 +40,7 @@ origins = [
     'https://690e0eee4a3e6a881385e8c2--bucolic-llama-3a585d.netlify.app/',
     'http://agendamento-front.onrender.com',
     'http://690e0eee4a3e6a881385e8c2--bucolic-llama-3a585d.netlify.app/',
+    'https://front-pi-3.onrender.com',
 ]
 
 app.add_middleware(

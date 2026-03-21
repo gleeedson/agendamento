@@ -1,3 +1,5 @@
+import warnings
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -86,3 +88,8 @@ def admin_token(admin_user):
         'email': admin_user.email,
         'is_admin': admin_user.is_admin,
     })
+
+
+@pytest.fixture(autouse=True)
+def suppress_resource_warnings():
+    warnings.simplefilter('ignore', ResourceWarning)
