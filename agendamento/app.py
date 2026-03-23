@@ -1,18 +1,21 @@
+import calendar
 from datetime import date, datetime, time
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, File, HTTPException, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from agendamento.database import get_session
-from agendamento.models import Agendamento, User
+from agendamento.models import Agendamento, Pagamento, User
 from agendamento.schemas import (
     AgendamentoAdminCriar,
     AgendamentoCriar,
     AgendamentoPublico,
     HorariosDisponiveis,
     Message,
+    PagamentoPublico,
+    PagamentoStatus,
     Token,
     UserList,
     UserLogin,
@@ -26,6 +29,16 @@ from agendamento.security import (
 )
 
 app = FastAPI(title='API de agendamentos')
+
+dezembro = 12
+
+
+def add_one_month(d: date) -> date:
+    if d.month == dezembro:
+        return d.replace(year=d.year + 1, month=1)
+    else:
+        days_in_month = calendar.monthrange(d.year, d.month + 1)[1]
+        return d.replace(month=d.month + 1, day=min(d.day, days_in_month))
 
 
 # Configurar CORS
@@ -81,6 +94,15 @@ def registrar_usuario(
     session.add(new_user)
     session.commit()
     session.refresh(new_user)
+
+    # Criar primeiro pagamento
+    primeiro_pagamento = Pagamento(
+        id_usuario=new_user.id,
+        data_vencimento=add_one_month(date.today()),
+        status='Em dia'
+    )
+    session.add(primeiro_pagamento)
+    session.commit()
 
     return new_user
 
@@ -241,6 +263,55 @@ def cancelar_agendamento(
     return {'message': 'Agendamento cancelado com sucesso'}
 
 
+@app.get('/pagamento/status', response_model=PagamentoStatus)
+def status_pagamento(
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    pagamento = session.scalar(
+        select(Pagamento)
+        .where(Pagamento.id_usuario == user.id)
+        .order_by(Pagamento.data_vencimento.desc())
+    )
+    if not pagamento:
+        return {'status': 'Em dia', 'data_proximo_vencimento': None}
+
+    status_atual = pagamento.status
+    if status_atual == 'Em dia' and date.today() > pagamento.data_vencimento:
+        status_atual = 'Atrasado'
+
+    return {
+        'status': status_atual,
+        'data_proximo_vencimento': pagamento.data_vencimento
+    }
+
+
+@app.post('/pagamento/comprovante', response_model=Message)
+def enviar_comprovante(
+    arquivo: UploadFile = File(...),
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    pagamento = session.scalar(
+        select(Pagamento)
+        .where(Pagamento.id_usuario == user.id)
+        .order_by(Pagamento.data_vencimento.desc())
+    )
+    if not pagamento:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Pagamento não encontrado"
+            )
+
+    arquivo_bytes = arquivo.file.read()
+    pagamento.comprovante = arquivo_bytes
+    pagamento.comprovante_mime = arquivo.content_type
+    pagamento.status = 'Aguardando confirmação'
+    session.commit()
+
+    return {'message': 'Comprovante enviado com sucesso'}
+
+
 # Rotas para o Adm
 @app.get('/admin/usuarios', response_model=UserList)
 def listar_usuarios(
@@ -248,7 +319,27 @@ def listar_usuarios(
     admin: User = Depends(get_current_admin),
 ):
     usuarios = session.scalars(select(User)).all()
-    return {'users': usuarios}
+    resultado = []
+    for u in usuarios:
+        pagamento = session.scalar(
+            select(Pagamento)
+            .where(Pagamento.id_usuario == u.id)
+            .order_by(Pagamento.data_vencimento.desc())
+        )
+        status_pag = None
+        data_venc = None
+        if pagamento:
+            status_pag = pagamento.status
+            if status_pag == 'Em dia' and date.today() > pagamento.data_vencimento:
+                status_pag = 'Atrasado'
+            data_venc = pagamento.data_vencimento
+
+        u_obj = UserPublic.model_validate(u)
+        u_obj.status_pagamento = status_pag
+        u_obj.data_proximo_vencimento = data_venc
+        resultado.append(u_obj)
+
+    return {'users': resultado}
 
 
 @app.post(
@@ -276,6 +367,15 @@ def criar_usuario_admin(
     session.add(new_user)
     session.commit()
     session.refresh(new_user)
+
+    # Criar primeiro pagamento
+    primeiro_pagamento = Pagamento(
+        id_usuario=new_user.id,
+        data_vencimento=date.today(),
+        status='Atrasado'
+    )
+    session.add(primeiro_pagamento)
+    session.commit()
 
     return new_user
 
@@ -414,3 +514,94 @@ def remover_agendamento_admin(
     session.commit()
 
     return {'message': 'Agendamento removido com sucesso'}
+
+
+@app.get('/admin/usuarios/{user_id}/pagamentos',
+         response_model=list[PagamentoPublico])
+def listar_pagamentos_usuario(
+    user_id: int,
+    session: Session = Depends(get_session),
+    admin: User = Depends(get_current_admin),
+):
+    pagamentos = session.scalars(
+        select(Pagamento)
+        .where(Pagamento.id_usuario == user_id)
+        .order_by(Pagamento.data_vencimento.desc())
+    ).all()
+
+    for p in pagamentos:
+        if p.status == 'Em dia' and date.today() > p.data_vencimento:
+            p.status = 'Atrasado'
+
+    return pagamentos
+
+
+@app.get('/admin/pagamentos/{pagamento_id}/comprovante')
+def ver_comprovante(
+    pagamento_id: int,
+    session: Session = Depends(get_session),
+    admin: User = Depends(get_current_admin),
+):
+    pagamento = session.scalar(select(Pagamento).where(Pagamento.id == pagamento_id))
+    if not pagamento or not pagamento.comprovante:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Comprovante não encontrado"
+            )
+
+    return Response(
+        content=pagamento.comprovante,
+        media_type=pagamento.comprovante_mime or 'application/octet-stream'
+        )
+
+
+@app.patch('/admin/pagamentos/{pagamento_id}/aprovar', response_model=Message)
+def aprovar_pagamento(
+    pagamento_id: int,
+    session: Session = Depends(get_session),
+    admin: User = Depends(get_current_admin),
+):
+    pagamento = session.scalar(
+        select(Pagamento).where(Pagamento.id == pagamento_id)
+        )
+    if not pagamento:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Pagamento não encontrado"
+            )
+
+    pagamento.status = 'Aprovado'
+
+    mais_recente = session.scalar(
+        select(Pagamento)
+        .where(Pagamento.id_usuario == pagamento.id_usuario)
+        .order_by(Pagamento.data_vencimento.desc())
+    )
+    if mais_recente and mais_recente.id == pagamento.id:
+        novo_pag = Pagamento(
+            id_usuario=pagamento.id_usuario,
+            data_vencimento=add_one_month(pagamento.data_vencimento),
+            status='Em dia'
+        )
+        session.add(novo_pag)
+
+    session.commit()
+    return {'message': 'Pagamento aprovado com sucesso'}
+
+
+@app.patch('/admin/pagamentos/{pagamento_id}/recusar', response_model=Message)
+def recusar_pagamento(
+    pagamento_id: int,
+    session: Session = Depends(get_session),
+    admin: User = Depends(get_current_admin),
+):
+    pagamento = session.scalar(select(Pagamento).where(Pagamento.id == pagamento_id))
+    if not pagamento:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Pagamento não encontrado"
+            )
+
+    pagamento.status = 'Atrasado'
+    session.commit()
+    return {'message': 'Pagamento recusado com sucesso'}

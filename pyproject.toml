@@ -35,7 +35,7 @@ psycopg2-binary = "^2.9.9"
 
 
 [tool.ruff]
-line-length = 79
+line-length = 90
 extend-exclude = ['migrations']
 
 [tool.ruff.lint]

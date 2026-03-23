@@ -21,6 +21,8 @@ class UserPublic(BaseModel):
     nome: str
     email: EmailStr
     is_admin: bool
+    status_pagamento: str | None = None
+    data_proximo_vencimento: date | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -65,3 +67,17 @@ class AgendamentoPublico(BaseModel):
 class HorariosDisponiveis(BaseModel):
     data: date
     horarios_disponiveis: list[str]
+
+
+class PagamentoPublico(BaseModel):
+    id: int
+    id_usuario: int
+    data_vencimento: date
+    status: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PagamentoStatus(BaseModel):
+    status: str
+    data_proximo_vencimento: date | None = None

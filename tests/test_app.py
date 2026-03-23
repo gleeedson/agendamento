@@ -22,12 +22,12 @@ def test_create_user(client):
         },
     )
     assert response.status_code == HTTPStatus.CREATED
-    assert response.json() == {
-        'nome': 'alice',
-        'email': 'alice@example.com',
-        'id': 1,
-        'is_admin': False,
-    }
+    data = response.json()
+    # aceitar campos adicionais (por exemplo status_pagamento/data_proximo_vencimento)
+    assert data['nome'] == 'alice'
+    assert data['email'] == 'alice@example.com'
+    assert data['id'] == 1
+    assert data['is_admin'] is False
 
 
 def test_registrar_email_duplicado(client, user):

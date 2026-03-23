@@ -26,3 +26,16 @@ class Agendamento:
     id_usuario: Mapped[int] = mapped_column(ForeignKey('users.id'))
     data: Mapped[date]
     hora: Mapped[time]
+
+
+@table_registry.mapped_as_dataclass
+class Pagamento:
+    __tablename__ = 'pagamentos'
+
+    id: Mapped[int] = mapped_column(init=False, primary_key=True)
+    id_usuario: Mapped[int] = mapped_column(ForeignKey('users.id'))
+    data_vencimento: Mapped[date]
+    status: Mapped[str]
+    # Status: 'Em dia', 'Atrasado', 'Aguardando confirmação', 'Aprovado', 'Recusado'
+    comprovante: Mapped[bytes | None] = mapped_column(default=None)
+    comprovante_mime: Mapped[str | None] = mapped_column(default=None)
