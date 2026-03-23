@@ -100,8 +100,8 @@ def registrar_usuario(
     # Criar primeiro pagamento
     primeiro_pagamento = Pagamento(
         id_usuario=new_user.id,
-        data_vencimento=add_one_month(date.today()),
-        status='Em dia'
+        data_vencimento=date.today(),
+        status='Atrasado'
     )
     session.add(primeiro_pagamento)
     session.commit()
