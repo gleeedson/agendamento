@@ -1,10 +1,20 @@
 import calendar
+import logging
 from datetime import date, datetime, time
 
-from fastapi import Depends, FastAPI, File, HTTPException, Response, UploadFile, status, Request
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select
-from sqlalchemy import delete
+from fastapi.responses import JSONResponse
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from agendamento.database import get_session
@@ -77,7 +87,6 @@ async def catch_exceptions_middleware(request: Request, call_next):
         response = await call_next(request)
         return response
     except Exception as exc:
-        import logging
         logging.exception("Unhandled exception: %s", exc)
 
         # Monta cabeçalhos CORS basicamente compatíveis com nossa configuração
@@ -90,8 +99,6 @@ async def catch_exceptions_middleware(request: Request, call_next):
         headers['Access-Control-Allow-Credentials'] = 'true'
         headers['Access-Control-Allow-Methods'] = ','.join(['*'])
         headers['Access-Control-Allow-Headers'] = ','.join(['*'])
-
-        from fastapi.responses import JSONResponse
 
         return JSONResponse(
             status_code=500,
