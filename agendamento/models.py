@@ -23,7 +23,7 @@ class Agendamento:
     __table_args__ = (UniqueConstraint('data', 'hora'),)
 
     id: Mapped[int] = mapped_column(init=False, primary_key=True)
-    id_usuario: Mapped[int] = mapped_column(ForeignKey('users.id'))
+    id_usuario: Mapped[int] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'))
     data: Mapped[date]
     hora: Mapped[time]
 
@@ -33,7 +33,7 @@ class Pagamento:
     __tablename__ = 'pagamentos'
 
     id: Mapped[int] = mapped_column(init=False, primary_key=True)
-    id_usuario: Mapped[int] = mapped_column(ForeignKey('users.id'))
+    id_usuario: Mapped[int] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'))
     data_vencimento: Mapped[date]
     status: Mapped[str]
     # Status: 'Em dia', 'Atrasado', 'Aguardando confirmação', 'Aprovado', 'Recusado'

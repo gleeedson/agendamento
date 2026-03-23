@@ -1,9 +1,10 @@
 import calendar
 from datetime import date, datetime, time
 
-from fastapi import Depends, FastAPI, File, HTTPException, Response, UploadFile, status
+from fastapi import Depends, FastAPI, File, HTTPException, Response, UploadFile, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
+from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from agendamento.database import get_session
@@ -65,6 +66,38 @@ app.add_middleware(
     allow_methods=['*'],
     allow_headers=['*'],
 )
+
+
+@app.middleware("http")
+async def catch_exceptions_middleware(request: Request, call_next):
+    """Captura exceções inesperadas e garante que a resposta de erro
+    inclua cabeçalhos CORS para que o frontend possa ler a mensagem.
+    """
+    try:
+        response = await call_next(request)
+        return response
+    except Exception as exc:
+        import logging
+        logging.exception("Unhandled exception: %s", exc)
+
+        # Monta cabeçalhos CORS basicamente compatíveis com nossa configuração
+        headers = {}
+        origin = request.headers.get('origin')
+        if origin and origin in origins:
+            headers['Access-Control-Allow-Origin'] = origin
+        elif '*' in origins:
+            headers['Access-Control-Allow-Origin'] = '*'
+        headers['Access-Control-Allow-Credentials'] = 'true'
+        headers['Access-Control-Allow-Methods'] = ','.join(['*'])
+        headers['Access-Control-Allow-Headers'] = ','.join(['*'])
+
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(
+            status_code=500,
+            content={'detail': 'Internal server error'},
+            headers=headers,
+        )
 
 
 @app.get('/', status_code=status.HTTP_200_OK, response_model=Message)
@@ -400,6 +433,10 @@ def remover_usuario_admin(
             status_code=status.HTTP_404_NOT_FOUND,
             detail='Usuário não encontrado',
         )
+
+    # Remover agendamentos e pagamentos associados antes de deletar o usuário
+    session.execute(delete(Agendamento).where(Agendamento.id_usuario == user.id))
+    session.execute(delete(Pagamento).where(Pagamento.id_usuario == user.id))
 
     session.delete(user)
     session.commit()
